@@ -1,4 +1,3 @@
-selenium
 fastapi
 uvicorn
 python-dotenv

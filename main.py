@@ -26,3 +26,8 @@ async def receive_webhook(req: Request):
 def run_bot(order_url):
     print(f"[TEST MODE] Pretend to visit: {order_url}")
     return True
+
+# ✅ Ini WAJIB agar Railway bisa run
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

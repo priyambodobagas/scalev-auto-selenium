@@ -1,49 +1,28 @@
-# main.py
 import os
-import hmac
-import base64
-import json
-from flask import Flask, request, jsonify
+import time
+from fastapi import FastAPI, Request
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-import time
+from dotenv import load_dotenv
 
-app = Flask(__name__)
+load_dotenv()
 
-SCALEV_SECRET = os.getenv("SCALEV_SECRET")
-AUTH_TOKEN = os.getenv("SCALEV_AUTH")
+SCALEV_EMAIL = os.getenv("SCALEV_EMAIL")
+SCALEV_PASSWORD = os.getenv("SCALEV_PASSWORD")
 
-@app.route("/", methods=["GET"])
-def home():
-    return "Scalev Auto Mark Not Spam is running."
+app = FastAPI()
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    sig = request.headers.get("X-Scalev-Hmac-Sha256")
-    raw_body = request.data
+@app.post("/")
+async def receive_webhook(req: Request):
+    payload = await req.json()
+    secret_slug = payload["data"]["secret_slug"]
+    order_url = f"https://app.scalev.id/order/public/{secret_slug}"
 
-    calculated_hmac = base64.b64encode(
-        hmac.new(SCALEV_SECRET.encode(), raw_body, "sha256").digest()
-    ).decode()
+    result = run_bot(order_url)
+    return {"status": "done", "url": order_url, "success": result}
 
-    if sig != calculated_hmac:
-        return "Invalid signature", 403
-
-    data = request.json
-    order_url = data["data"]["order_id"]  # ganti jika bukan order_id numeric
-    order_id_numeric = extract_numeric_order_id(order_url)
-    
-    print(f"Marking as not spam: {order_id_numeric}")
-    success = mark_not_spam(order_id_numeric)
-    return jsonify({"success": success})
-
-def extract_numeric_order_id(order_str):
-    # Dummy function for now - you can refine this
-    return "2903409"  # Ganti ini nanti dengan parser dinamis
-
-def mark_not_spam(order_id):
+def run_bot(order_url):
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
@@ -51,22 +30,27 @@ def mark_not_spam(order_id):
 
     driver = webdriver.Chrome(options=chrome_options)
     try:
-        driver.get(f"https://app.scalev.id/order/{order_id}")
+        driver.get("https://app.scalev.id/login")
+        time.sleep(2)
+
+        # Login
+        driver.find_element(By.NAME, "email").send_keys(SCALEV_EMAIL)
+        driver.find_element(By.NAME, "password").send_keys(SCALEV_PASSWORD)
+        driver.find_element(By.TAG_NAME, "form").submit()
+
         time.sleep(3)
 
-        # Tambahkan login jika diperlukan
-        # driver.find_element(By.ID, "email").send_keys("xxx")
-        # driver.find_element(By.ID, "password").send_keys("xxx")
+        # Buka order public page
+        driver.get(order_url)
+        time.sleep(3)
 
-        button = driver.find_element(By.XPATH, "//*[contains(text(), 'Not Spam') or contains(text(), 'Bukan Spam')]")
-        button.click()
+        # Klik tombol "Not Spam"
+        btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Not Spam') or contains(text(), 'Bukan Spam')]")
+        btn.click()
         time.sleep(2)
         return True
     except Exception as e:
-        print("Error:", e)
+        print("Gagal:", e)
         return False
     finally:
         driver.quit()
-
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

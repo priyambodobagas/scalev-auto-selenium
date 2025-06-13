@@ -13,6 +13,10 @@ SCALEV_PASSWORD = os.getenv("SCALEV_PASSWORD")
 
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"status": "Scalev Auto Mark Not Spam is running."}
+
 @app.post("/")
 async def receive_webhook(req: Request):
     payload = await req.json()
@@ -33,20 +37,16 @@ def run_bot(order_url):
         driver.get("https://app.scalev.id/login")
         time.sleep(2)
 
-        # Login
         driver.find_element(By.NAME, "email").send_keys(SCALEV_EMAIL)
         driver.find_element(By.NAME, "password").send_keys(SCALEV_PASSWORD)
         driver.find_element(By.TAG_NAME, "form").submit()
-
         time.sleep(3)
 
-        # Buka order public page
         driver.get(order_url)
         time.sleep(3)
 
-        # Klik tombol "Not Spam"
-        btn = driver.find_element(By.XPATH, "//*[contains(text(), 'Not Spam') or contains(text(), 'Bukan Spam')]")
-        btn.click()
+        button = driver.find_element(By.XPATH, "//*[contains(text(), 'Not Spam') or contains(text(), 'Bukan Spam')]")
+        button.click()
         time.sleep(2)
         return True
     except Exception as e:
